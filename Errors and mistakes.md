@@ -36,3 +36,13 @@ attempting to create an instance. For the different patterns supported at design
 --------------------
 when: after the previous error was solved and i tried to add migration again
 solution : i need to configure the relationships in onModelCreating method in ApplicationDbContext class
+
+##################################
+---------------------
+Severity	Code	Description	Project	File	Line	Suppression State	Details
+Error (active)	CS1061	'EntityEntry<User>' does not contain a definition for 'GetAwaiter' and no accessible extension method 'GetAwaiter' accepting a first argument of 
+type 'EntityEntry<User>' could be found (are you missing a using directive or an assembly reference?)	PayWise.Infrastructure	
+C:\Users\soha mohamed\source\repos\PayWise\PayWise.Infrastructure\Repositories\UserRepository.cs	43		
+--------------------
+
+

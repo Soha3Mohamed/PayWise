@@ -100,3 +100,10 @@ Infrastructure provides the actual EF implementation.
 Api wires everything up with Dependency Injection.
 ///////////////////
 //im tired now, i will try to be back
+
+//i want to master logging and serilog today so i found a good playlist and let's see
+//okay i am good with serilog, i will see the seq video and then move on to the next step( i don't know yet )
+
+
+In ServiceResult<t> class, i used private constructor this time for immutability because chatgpt reminded me thaty anyone can alter the errormessage which is not consistent 
+ actually my old version will work fine but i want to get used to writing not good code, but better code
