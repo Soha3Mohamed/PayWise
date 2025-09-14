@@ -18,3 +18,51 @@ the secret key should be kept safe and not exposed to the client because the ser
 it does that by hashing the header and payload with the secret key and comparing it to the signature in the token
 the token can also contain an expiration time after which it is no longer valid
 
+#code:
+in userService, generatetoken method: 
+
+    private readonly string _jwtKey = "secretKeyforjwtauthenticationforPayWise"; // should come from config
+
+private string GenerateToken(User user)
+        {
+            var claims = new List<Claim>
+        {
+            new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+            new Claim(ClaimTypes.Email, user.Email)
+        };
+
+            var key = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(_jwtKey));
+            var signingKey = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+            var token = new JwtSecurityToken(
+                claims: claims,
+                expires: DateTime.UtcNow.AddDays(1),
+                signingCredentials: signingKey
+            );
+
+            return new JwtSecurityTokenHandler().WriteToken(token);
+        }
+
+and in program.cs: 
+ //add authentication schema 
+            builder.Services
+                            .AddAuthentication(op =>op.DefaultAuthenticateScheme = "MySchema")
+                            .AddJwtBearer("MySchema", option => {
+
+                                string _jwtKey = "secretKeyforjwtauthenticationforPayWise";
+                                var key = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(_jwtKey));
+
+                                option.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters()
+                                {
+                                    IssuerSigningKey = key,
+                                    ValidateIssuer = false,
+                                    ValidateAudience = false,
+                                };
+            }); 
+
+//add authentication middleware
+
+		app.UseAuthentication();
+			app.UseAuthorization();
+
+

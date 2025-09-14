@@ -3,10 +3,12 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
+using AutoMapper;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 using PayWise.Application.Common;
@@ -24,33 +26,37 @@ namespace PayWise.Application.Implementation
     {
         private readonly ILogger<UserService> _logger;
         private readonly IUserRepository _userRepository;
+        private readonly IMapper _mapper;
         private readonly string _jwtKey = "secretKeyforjwtauthenticationforPayWise"; // should come from config
 
-        public UserService(ILogger<UserService> logger, IUserRepository userRepository)
+        public UserService(ILogger<UserService> logger, IUserRepository userRepository, IMapper mapper)
         {
             _logger = logger;
             _userRepository = userRepository;
+            _mapper =  mapper;
         }
 
-        public async Task<ServiceResult<User?>> GetUserByIdAsync(int id)
+        public async Task<ServiceResult<UserResponseDTO>> GetUserByIdAsync(int id)
         {
             var user = await _userRepository.GetByIdAsync(id);
 
             if (user == null)
             {
                 _logger.LogWarning("User with id {Id} not found", id);
-                return ServiceResult<User?>.Fail($"User with this id: {id} is Not Found");
+                return ServiceResult<UserResponseDTO>.Fail($"User with this id: {id} is Not Found");
             }
 
             _logger.LogInformation("User with id {Id} retrieved successfully", id);
-            return ServiceResult<User?>.Ok(user);
+
+            var dto = _mapper.Map<UserResponseDTO>(user);
+            return ServiceResult<UserResponseDTO>.Ok(dto);
         }
 
         public async Task<ServiceResult<string>> AuthenticateAsync(string email, string password)
         {
             var user = await _userRepository.GetByEmailAsync(email);
 
-            if (user == null || user.PasswordHash == PasswordHasher.Hash(password))
+            if (user == null || PasswordHasher.VerifyPassword(password, user.PasswordHash))
             {
                 _logger.LogWarning("Authentication failed for email {Email}", email);
                 return ServiceResult<string>.Fail("Authentication Failed, Credentials don't match");
@@ -63,32 +69,34 @@ namespace PayWise.Application.Implementation
             return ServiceResult<string>.Ok(token);
         }
 
-        public async Task<ServiceResult<User>> RegisterUserAsync(UserRegisterationDTO registrationDTO)
+        public async Task<ServiceResult<UserResponseDTO>> RegisterUserAsync(UserRegisterationDTO registrationDTO)
         {
             // Check if user already exists
             var existingUser = await _userRepository.GetByEmailAsync(registrationDTO.Email);
             if (existingUser != null)
             {
                 _logger.LogWarning("User registration failed: email {Email} already exists", registrationDTO.Email);
-                return ServiceResult<User>.Fail("Email is already registered");
+                return ServiceResult<UserResponseDTO>.Fail("Email is already registered");
             }
-            var user = new User
-            {
+            var user = _mapper.Map<User>(registrationDTO);
+            //var user = new User
+            //{
 
-                Email = registrationDTO.Email,
-                PasswordHash = PasswordHasher.Hash(registrationDTO.Password), // In real applications, hash the password
-                FirstName = registrationDTO.FirstName,
-                LastName = registrationDTO.LastName,
-                CreatedAt = DateTime.UtcNow,
-                LastUpdatedAt = DateTime.UtcNow
-            };
+            //    Email = registrationDTO.Email,
+            //    PasswordHash = PasswordHasher.Hash(registrationDTO.Password), // In real applications, hash the password
+            //    FirstName = registrationDTO.FirstName,
+            //    LastName = registrationDTO.LastName,
+            //    CreatedAt = DateTime.UtcNow,
+            //    LastUpdatedAt = DateTime.UtcNow
+            //};
             // Save new user
             await _userRepository.AddAsync(user);
             await _userRepository.SaveChangesAsync();
 
             _logger.LogInformation("User {Email} registered successfully", user.Email);
 
-            return ServiceResult<User>.Ok(user);
+            var dto = _mapper.Map<UserResponseDTO>(user);
+            return ServiceResult<UserResponseDTO>.Ok(dto);
         }
 
         private string GenerateToken(User user)
@@ -111,45 +119,51 @@ namespace PayWise.Application.Implementation
             return new JwtSecurityTokenHandler().WriteToken(token);
         }
 
-        public async Task<ServiceResult<IEnumerable<User>>> GetAllUsersAsync()
+        public async Task<ServiceResult<IEnumerable<UserResponseDTO>>> GetAllUsersAsync()
         {
             var users = await _userRepository.GetAllAsync();
-            if (users == null)
+            if (users == null || !users.Any())
             {
                 _logger.LogWarning("No users found in the system");
-                return ServiceResult<IEnumerable<User>>.Fail("No users found");
+                return ServiceResult<IEnumerable<UserResponseDTO>>.Fail("No users found");
             }
-            _logger.LogInformation("Retrieved {Count} users", users.Count());
-            return ServiceResult<IEnumerable<User>>.Ok(users);
-        }
 
-        public async Task<ServiceResult<User>> UpdateUserAsync(UserUpdateDTO updateDTO)
+            _logger.LogInformation("Retrieved {Count} users", users.Count());
+
+            var dtoList = _mapper.Map<IEnumerable<UserResponseDTO>>(users);
+            return ServiceResult<IEnumerable<UserResponseDTO>>.Ok(dtoList);
+        }
+        public async Task<ServiceResult<UserResponseDTO>> UpdateUserAsync(int userId, UserUpdateDTO updateDTO)
         {
-            var existingUser = await _userRepository.GetByEmailAsync(updateDTO.Email);
-            if (existingUser != null)
+            var user = await _userRepository.GetByIdAsync(userId);
+            if (user == null)
+            {
+                _logger.LogWarning("User with id {Id} not found", userId);
+                return ServiceResult<UserResponseDTO>.Fail("User not found");
+            }
+
+            // Check if email is already used by another user
+            var existingUserWithEmail = await _userRepository.GetByEmailAsync(updateDTO.Email);
+            if (existingUserWithEmail != null && existingUserWithEmail.Id != userId)
             {
                 _logger.LogWarning("User update failed: email {Email} already exists", updateDTO.Email);
-                return ServiceResult<User>.Fail("Email is already registered");
+                return ServiceResult<UserResponseDTO>.Fail("Email is already registered");
             }
-            var user = new User
-            {
 
-                Email = updateDTO.Email,
-                FirstName = updateDTO.FirstName,
-                LastName = updateDTO.LastName,
-                
-                LastUpdatedAt = DateTime.UtcNow
-            };
-            // Save new user
+            // Apply updates to the existing entity
+            _mapper.Map(updateDTO, user);
+            user.LastUpdatedAt = DateTime.UtcNow;
+
             await _userRepository.UpdateAsync(user);
             await _userRepository.SaveChangesAsync();
 
             _logger.LogInformation("User {Email} updated successfully", user.Email);
 
-            return ServiceResult<User>.Ok(user);
+            var dto = _mapper.Map<UserResponseDTO>(user);
+            return ServiceResult<UserResponseDTO>.Ok(dto);
         }
 
-        public async Task<ServiceResult<bool>> DeleteUserAsync(int id)
+            public async Task<ServiceResult<bool>> DeleteUserAsync(int id)
         {
             var user = await _userRepository.GetByIdAsync(id);
 

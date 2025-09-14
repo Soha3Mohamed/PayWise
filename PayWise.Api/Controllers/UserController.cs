@@ -44,6 +44,19 @@ namespace PayWise.Api.Controllers
             return Ok(result.Data);
         }
 
+        [HttpGet]
+        [Authorize]
+        public async Task<IActionResult> GetAllUsers()
+        {
+            var result = await _userService.GetAllUsersAsync();
+            if (!result.Success || result.Data == null)
+            {
+                return NotFound(result.ErrorMessage);
+            }
+
+            return Ok(result.Data);
+        }
+
         [HttpPost("authenticate")]
         public async Task<IActionResult> Authenticate([FromQuery] string email, [FromQuery] string password)
         {

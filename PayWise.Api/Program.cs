@@ -5,6 +5,10 @@ using PayWise.Infrastructure.Contexts;
 using Serilog;
 using PayWise.Infrastructure.Extensions;
 using PayWise.Application;
+using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
+using PayWise.Application.Mappings;
 namespace PayWise.Api
 {
     public class Program
@@ -38,6 +42,60 @@ namespace PayWise.Api
             builder.Services.AddInfrastructureServices(); 
             builder.Services.AddApplicationServices();
 
+            #region add authentication schema 
+            //add authentication schema 
+            builder.Services
+                            .AddAuthentication(op => op.DefaultAuthenticateScheme = "MySchema")
+                            .AddJwtBearer("MySchema", option =>
+                            {
+
+                                string _jwtKey = "secretKeyforjwtauthenticationforPayWise";
+                                var key = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(_jwtKey));
+
+                                option.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters()
+                                {
+                                    IssuerSigningKey = key,
+                                    ValidateIssuer = false,
+                                    ValidateAudience = false,
+                                };
+                            }); 
+            #endregion
+
+            #region adding authentication to swagger 
+            builder.Services.AddSwaggerGen(c =>
+                {
+                    c.SwaggerDoc("v1", new() { Title = "LmsApi", Version = "v1" });
+
+                    c.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+                    {
+                        Name = "Authorization",
+                        Type = Microsoft.OpenApi.Models.SecuritySchemeType.ApiKey,
+                        Scheme = "Bearer",
+                        BearerFormat = "JWT",
+                        In = Microsoft.OpenApi.Models.ParameterLocation.Header,
+                        Description = "Enter: Bearer <your JWT token>"
+                    });
+
+                    c.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
+        {
+        {
+            new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+            {
+                Reference = new Microsoft.OpenApi.Models.OpenApiReference
+                {
+                    Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            Array.Empty<string>()
+        }
+        });
+                });
+
+            #endregion
+
+            builder.Services.AddAutoMapper(typeof(UserProfile).Assembly);
+
             var app = builder.Build();
 
             // Configure the HTTP request pipeline.
@@ -50,6 +108,7 @@ namespace PayWise.Api
 
             app.UseSerilogRequestLogging(); // logs HTTP requests
 
+            app.UseAuthentication();
             app.UseAuthorization();
 
 
