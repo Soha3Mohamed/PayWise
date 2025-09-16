@@ -27,13 +27,15 @@ namespace PayWise.Application.Implementation
         private readonly ILogger<UserService> _logger;
         private readonly IUserRepository _userRepository;
         private readonly IMapper _mapper;
+        private readonly IWalletService _walletService;
         private readonly string _jwtKey = "secretKeyforjwtauthenticationforPayWise"; // should come from config
 
-        public UserService(ILogger<UserService> logger, IUserRepository userRepository, IMapper mapper)
+        public UserService(ILogger<UserService> logger, IUserRepository userRepository, IMapper mapper, IWalletService walletService)
         {
             _logger = logger;
             _userRepository = userRepository;
             _mapper =  mapper;
+            this._walletService = walletService;
         }
 
         public async Task<ServiceResult<UserResponseDTO>> GetUserByIdAsync(int id)
@@ -79,6 +81,9 @@ namespace PayWise.Application.Implementation
                 return ServiceResult<UserResponseDTO>.Fail("Email is already registered");
             }
             var user = _mapper.Map<User>(registrationDTO);
+            user.PasswordHash = PasswordHasher.Hash(registrationDTO.Password); // hash password
+            user.CreatedAt = DateTime.UtcNow;
+            user.LastUpdatedAt = DateTime.UtcNow;
             //var user = new User
             //{
 
@@ -93,7 +98,15 @@ namespace PayWise.Application.Implementation
             await _userRepository.AddAsync(user);
             await _userRepository.SaveChangesAsync();
 
-            _logger.LogInformation("User {Email} registered successfully", user.Email);
+            var walletResult = await _walletService.CreateWalletAsync(user.Id, new AddWalletDTO { Balance = 0m });
+            if (!walletResult.Success)
+            {
+                _logger.LogError("Failed to create wallet for user {UserId}: {Message}", user.Id, walletResult.ErrorMessage);
+                return ServiceResult<UserResponseDTO>.Fail("User created but wallet creation failed");
+            }
+
+            _logger.LogInformation("User {Email} registered successfully with Wallet {WalletId}", user.Email, walletResult.Data);
+
 
             var dto = _mapper.Map<UserResponseDTO>(user);
             return ServiceResult<UserResponseDTO>.Ok(dto);
@@ -178,9 +191,22 @@ namespace PayWise.Application.Implementation
             return ServiceResult<bool>.Ok(true);
         }
 
-        public Task<ServiceResult<string>> ChangePasswordAsync(int id)
+        public async Task<ServiceResult<string>> ChangePasswordAsync(int id, string newPassword)
         {
-            throw new NotImplementedException();
+            var user = await _userRepository.GetByIdAsync(id);
+            if(user == null)
+            {
+                _logger.LogWarning("User with id {Id} not found", id);
+                return ServiceResult<string>.Fail("User not found");
+            }
+            if (PasswordHasher.VerifyPassword(user.PasswordHash, newPassword))
+            {
+                return ServiceResult<string>.Fail("The new password is the same as your old one");
+            }
+            user.PasswordHash = PasswordHasher.Hash(newPassword);
+            await _userRepository.SaveChangesAsync();
+            _logger.LogInformation("User {password} updated successfully",newPassword);
+            return ServiceResult<string>.Ok($"The new password is: {newPassword}");
         }
     }
 

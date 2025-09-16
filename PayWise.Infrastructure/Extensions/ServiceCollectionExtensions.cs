@@ -20,7 +20,7 @@ namespace PayWise.Infrastructure.Extensions
 
             // Add repositories
             services.AddScoped<IUserRepository, UserRepository>();
-            //services.AddScoped<IWalletRepository, WalletRepository>();
+            services.AddScoped<IWalletRepository, WalletRepository>();
             //services.AddScoped<ITransactionRepository, TransactionRepository>();
 
             // Add other infrastructure services as needed

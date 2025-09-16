@@ -71,9 +71,22 @@ namespace PayWise.Api.Controllers
 
         [HttpPost("update")]
         [Authorize]
-        public async Task<IActionResult> Update(UserUpdateDTO updateDTO)
+        public async Task<IActionResult> Update(int userId, UserUpdateDTO updateDTO)
         {
-            var result = await _userService.UpdateUserAsync(updateDTO);
+            var result = await _userService.UpdateUserAsync(userId, updateDTO);
+            if (!result.Success)
+            {
+                return BadRequest(result.ErrorMessage);
+            }
+
+            return Ok(result.Data);
+        }
+
+        [HttpPost("change-password")]
+        [Authorize]
+        public async Task<IActionResult> ChangePassword(int userId, string newPassword)
+        {
+            var result = await _userService.ChangePasswordAsync(userId, newPassword);
             if (!result.Success)
             {
                 return BadRequest(result.ErrorMessage);

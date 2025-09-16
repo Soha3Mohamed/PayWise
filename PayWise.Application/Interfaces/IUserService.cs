@@ -19,5 +19,7 @@ namespace PayWise.Application.Interfaces
         Task<ServiceResult<UserResponseDTO>> UpdateUserAsync(int userId, UserUpdateDTO updateDTO);
         Task<ServiceResult<bool>> DeleteUserAsync(int id);
 
+        public Task<ServiceResult<string>> ChangePasswordAsync(int id, string newPassword);
+
     }
 }
