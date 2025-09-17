@@ -1,4 +1,4 @@
-💳 PayWise
+#💳 PayWise
 
 PayWise is a Fintech-inspired .NET 8 Web API project that demonstrates user management, wallet operations, and transaction handling in a clean, modular architecture.
 
@@ -18,7 +18,7 @@ Transaction Management & Wallet Logic
 
 Swagger/OpenAPI Documentation
 
-🚀 Features
+#🚀 Features
 👤 User Management
 
 Register, login, and authenticate with JWT
