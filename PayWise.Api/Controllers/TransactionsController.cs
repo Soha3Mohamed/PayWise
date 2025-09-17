@@ -1,5 +1,8 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using PayWise.Application.DTOs;
+using PayWise.Application.Interfaces;
+using PayWise.Core;
 
 namespace PayWise.Api.Controllers
 {
@@ -8,68 +11,46 @@ namespace PayWise.Api.Controllers
     public class TransactionsController : ControllerBase
     {
         private readonly ILogger<TransactionsController> _logger;
+        private readonly ITransactionService _transactionService;
 
-        public TransactionsController(ILogger<TransactionsController> logger)
+        public TransactionsController(ILogger<TransactionsController> logger, ITransactionService transactionService)
         {
             _logger = logger;
+            this._transactionService = transactionService;
         }
 
         // GET: api/transactions
         [HttpGet]
-        public IActionResult GetAllTransactions()
+        public async Task<ActionResult<ServiceResult<IEnumerable<TransactionResponseDTO>>>> GetAll()
         {
-            _logger.LogInformation("Fake: retrieving all transactions");
-            return Ok(new[]
-            {
-                new { Id = 1, FromWalletId = 101, ToWalletId = 202, Amount = 50.00m, Timestamp = DateTime.UtcNow },
-                new { Id = 2, FromWalletId = 202, ToWalletId = 101, Amount = 75.00m, Timestamp = DateTime.UtcNow }
-            });
+            var result = await _transactionService.GetAllAsync();
+            if (!result.Success)
+                return NotFound(result);
+
+            return Ok(result);
         }
 
-        // POST: api/transactions/transfer
-        [HttpPost("transfer")]
-        public IActionResult Transfer([FromQuery] int fromWalletId, [FromQuery] int toWalletId, [FromQuery] decimal amount)
+        // GET: api/transactions/{id}
+        [HttpGet("{id:int}")]
+        public async Task<ActionResult<ServiceResult<TransactionResponseDTO>>> GetById(int id)
         {
-            _logger.LogInformation("Fake: transferring {Amount} from {FromWallet} to {ToWallet}", amount, fromWalletId, toWalletId);
+            var result = await _transactionService.GetTransactionByIdAsync(id);
+            if (!result.Success)
+                return NotFound(result);
 
-            return Ok(new
-            {
-                Message = "Fake transfer successful",
-                FromWalletId = fromWalletId,
-                ToWalletId = toWalletId,
-                Amount = amount,
-                Timestamp = DateTime.UtcNow
-            });
+            return Ok(result);
         }
 
-        // POST: api/transactions/deposit
-        [HttpPost("deposit")]
-        public IActionResult Deposit([FromQuery] int walletId, [FromQuery] decimal amount)
+        // GET: api/transactions/wallet/{walletId}
+        [HttpGet("wallet/{walletId:int}")]
+        public async Task<ActionResult<ServiceResult<IEnumerable<TransactionResponseDTO>>>> GetByWalletId(int walletId)
         {
-            _logger.LogInformation("Fake: depositing {Amount} into wallet {WalletId}", amount, walletId);
+            var result = await _transactionService.GetTransactionsByWalletIdAsync(walletId);
+            if (!result.Success)
+                return NotFound(result);
 
-            return Ok(new
-            {
-                Message = "Fake deposit successful",
-                WalletId = walletId,
-                Amount = amount,
-                Timestamp = DateTime.UtcNow
-            });
-        }
-
-        // POST: api/transactions/withdraw
-        [HttpPost("withdraw")]
-        public IActionResult Withdraw([FromQuery] int walletId, [FromQuery] decimal amount)
-        {
-            _logger.LogInformation("Fake: withdrawing {Amount} from wallet {WalletId}", amount, walletId);
-
-            return Ok(new
-            {
-                Message = "Fake withdrawal successful",
-                WalletId = walletId,
-                Amount = amount,
-                Timestamp = DateTime.UtcNow
-            });
+            return Ok(result);
         }
     }
-}
+    }
+

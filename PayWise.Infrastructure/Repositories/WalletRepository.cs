@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using PayWise.Application.Interfaces;
 using PayWise.Core.Entities;
 using PayWise.Core.Interfaces;
 using PayWise.Infrastructure.Contexts;
@@ -10,10 +11,12 @@ namespace PayWise.Infrastructure.Repositories
     public class WalletRepository : IWalletRepository
     {
         private readonly ApplicationDbContext _dbContext;
+        private readonly ITransactionRepository _transactionRepo;
 
-        public WalletRepository(ApplicationDbContext dbContext)
+        public WalletRepository(ApplicationDbContext dbContext, ITransactionRepository transactionRepo)
         {
             _dbContext = dbContext;
+            this._transactionRepo = transactionRepo;
         }
         //i am not saving changes separately in every method because in the service there is a scenario where i create user then create his wallet
           //and then i want to save changes so 
@@ -76,8 +79,22 @@ namespace PayWise.Infrastructure.Repositories
                 fromWallet.Balance -= amount;
                 toWallet.Balance += amount;
 
+
                 await _dbContext.SaveChangesAsync();
                 await transaction.CommitAsync();
+
+                var transactionLog = new Transaction
+                {
+                    SourceWalletId = fromWallet.Id,
+                    DestinationWalletId = toWallet.Id,
+                    Amount = amount,
+                    CreatedAt = DateTime.UtcNow,
+                    Type = TransactionType.Deposit,
+                    Status = TransactionStatus.Success,
+                };
+
+                await _transactionRepo.AddAsync(transactionLog);
+                await _transactionRepo.SaveChangesAsync();
                 return true;
             }
             catch

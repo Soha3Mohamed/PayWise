@@ -17,6 +17,7 @@ namespace PayWise.Application
 
             services.AddScoped<IUserService, UserService>();
             services.AddScoped<IWalletService, WalletService>();
+            services.AddScoped<ITransactionService, TransactionService>();  
 
 
         }

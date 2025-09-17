@@ -10,6 +10,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using TransactionStatus = PayWise.Core.Entities.TransactionStatus;
+using TransactionType = PayWise.Core.Entities.TransactionType;
 
 namespace PayWise.Application.Implementation
 {
@@ -18,12 +20,14 @@ namespace PayWise.Application.Implementation
         private readonly IWalletRepository _walletRepository;
         private readonly ILogger<WalletService> _logger;
         private readonly IMapper _mapper;
+        private readonly ITransactionService _transactionService;
 
-        public WalletService(IWalletRepository walletRepository , ILogger<WalletService> logger, IMapper mapper)
+        public WalletService(IWalletRepository walletRepository , ILogger<WalletService> logger, IMapper mapper, ITransactionService transactionService)
         {
             this._walletRepository = walletRepository;
             this._logger = logger;
             this._mapper = mapper;
+            this._transactionService = transactionService;
         }
 
         public async Task<ServiceResult<IEnumerable<WalletResponseDTO>>> GetAllWalletsAsync()
@@ -141,6 +145,18 @@ namespace PayWise.Application.Implementation
             }
             wallet.Balance += amount;
             await _walletRepository.UpdateWalletAsync(wallet);
+
+            var transaction = new Transaction
+            {
+                SourceWalletId = walletId,
+                DestinationWalletId = walletId,
+                Amount = amount,
+                CreatedAt = DateTime.UtcNow,
+                Type = TransactionType.Deposit,
+                Status = TransactionStatus.Success,
+            };
+
+            await _transactionService.LogTransactionAsync(transaction);
             await _walletRepository.SaveChangesAsync();
             _logger.LogInformation("Wallet with id {Id}, Balance Updated successfully +{amount}", walletId, amount);
             return ServiceResult<decimal>.Ok(wallet.Balance);
@@ -174,6 +190,18 @@ namespace PayWise.Application.Implementation
             }
             wallet.Balance -= amount;
             await _walletRepository.UpdateWalletAsync(wallet);
+
+            var transaction = new Transaction
+            {
+                SourceWalletId = walletId,
+                DestinationWalletId = walletId,
+                Amount = amount,
+                CreatedAt = DateTime.UtcNow,
+                Type = TransactionType.Withdrawal,
+                Status = TransactionStatus.Success,
+            };
+
+            await _transactionService.LogTransactionAsync(transaction);
             await _walletRepository.SaveChangesAsync();
             _logger.LogInformation("Wallet with id {Id}, Balance Updated successfully -{amount}", walletId, amount);
             return ServiceResult<decimal>.Ok(wallet.Balance);
